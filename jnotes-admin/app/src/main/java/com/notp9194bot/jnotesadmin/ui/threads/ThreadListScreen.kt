@@ -2,7 +2,6 @@ package com.notp9194bot.jnotesadmin.ui.threads
 
 import android.app.Application
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,18 +18,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -135,6 +142,16 @@ class ThreadsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setBlock(userId: String, blockChat: Boolean? = null, blockFeedback: Boolean? = null, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val cfg = prefs.flow.firstOrNull() ?: return@launch onResult(false)
+            val api = JnotesApi(cfg.serverUrl, cfg.adminToken)
+            val res = runCatching { api.setUserBlock(userId, blockChat, blockFeedback) }.getOrNull()
+            onResult(res != null)
+            if (res != null) refreshNow()
+        }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer { ThreadsViewModel(this[APPLICATION_KEY]!!) }
@@ -147,10 +164,13 @@ class ThreadsViewModel(app: Application) : AndroidViewModel(app) {
 fun ThreadListScreen(
     onOpenChat: (String, String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDashboard: () -> Unit,
 ) {
     val vm: ThreadsViewModel = viewModel(factory = ThreadsViewModel.Factory)
     val state by vm.state.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { vm.start() }
 
     Scaffold(
@@ -167,6 +187,9 @@ fun ThreadListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenDashboard) {
+                        Icon(Icons.Outlined.Dashboard, contentDescription = "Dashboard")
+                    }
                     IconButton(onClick = { vm.refreshNow() }) {
                         Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
@@ -176,6 +199,7 @@ fun ThreadListScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             SecondaryTabRow(selectedTabIndex = tab) {
@@ -196,7 +220,34 @@ fun ThreadListScreen(
                 EmptyMessage(state.error ?: "Not configured. Open Settings to connect.")
                 return@Column
             }
-            if (tab == 0) ThreadList(state.threads, onOpenChat) else FeedbackList(state.feedback)
+            if (tab == 0) {
+                ThreadList(
+                    threads = state.threads,
+                    onOpenChat = onOpenChat,
+                    onToggleChatBlock = { t ->
+                        vm.setBlock(t.userId, blockChat = !t.blockChat) { ok ->
+                            scope.launch {
+                                snackbar.showSnackbar(
+                                    if (!ok) "Failed to update."
+                                    else if (!t.blockChat) "${t.name} can no longer message you."
+                                    else "${t.name} can message you again.",
+                                )
+                            }
+                        }
+                    },
+                    onToggleFeedbackBlock = { t ->
+                        vm.setBlock(t.userId, blockFeedback = !t.blockFeedback) { ok ->
+                            scope.launch {
+                                snackbar.showSnackbar(
+                                    if (!ok) "Failed to update."
+                                    else if (!t.blockFeedback) "${t.name} can no longer send feedback."
+                                    else "${t.name} can send feedback again.",
+                                )
+                            }
+                        }
+                    },
+                )
+            } else FeedbackList(state.feedback)
 
             state.error?.let { err ->
                 Text(
@@ -221,8 +272,14 @@ private fun EmptyMessage(text: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ThreadList(threads: List<JnotesApi.Thread>, onOpenChat: (String, String) -> Unit) {
+private fun ThreadList(
+    threads: List<JnotesApi.Thread>,
+    onOpenChat: (String, String) -> Unit,
+    onToggleChatBlock: (JnotesApi.Thread) -> Unit,
+    onToggleFeedbackBlock: (JnotesApi.Thread) -> Unit,
+) {
     if (threads.isEmpty()) { EmptyMessage("No conversations yet."); return }
     LazyColumn(
         contentPadding = PaddingValues(12.dp),
@@ -230,15 +287,31 @@ private fun ThreadList(threads: List<JnotesApi.Thread>, onOpenChat: (String, Str
         modifier = Modifier.fillMaxSize(),
     ) {
         items(threads, key = { it.userId }) { t ->
+            var menuOpen by remember(t.userId) { mutableStateOf(false) }
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenChat(t.userId, t.name) },
+                    .combinedClickable(
+                        onClick = { onOpenChat(t.userId, t.name) },
+                        onLongClick = { menuOpen = true },
+                    ),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 ),
             ) {
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (t.blockChat) "Unblock messaging" else "Block messaging") },
+                        leadingIcon = { Icon(Icons.Outlined.Block, null) },
+                        onClick = { menuOpen = false; onToggleChatBlock(t) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (t.blockFeedback) "Allow feedback" else "Block feedback") },
+                        leadingIcon = { Icon(Icons.Outlined.Feedback, null) },
+                        onClick = { menuOpen = false; onToggleFeedbackBlock(t) },
+                    )
+                }
                 Row(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,

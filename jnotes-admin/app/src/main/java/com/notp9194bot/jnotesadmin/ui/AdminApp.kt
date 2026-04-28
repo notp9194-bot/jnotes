@@ -7,12 +7,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.notp9194bot.jnotesadmin.ui.chat.AdminChatScreen
+import com.notp9194bot.jnotesadmin.ui.dashboard.AdminDashboardScreen
 import com.notp9194bot.jnotesadmin.ui.settings.AdminSettingsScreen
 import com.notp9194bot.jnotesadmin.ui.threads.ThreadListScreen
 
 object AdminRoutes {
     const val THREADS = "threads"
     const val SETTINGS = "settings"
+    const val DASHBOARD = "dashboard"
     const val CHAT = "chat/{userId}/{name}"
     fun chat(userId: String, name: String) = "chat/$userId/${name.ifBlank { "User" }}"
 }
@@ -25,10 +27,17 @@ fun AdminApp() {
             ThreadListScreen(
                 onOpenChat = { userId, name -> nav.navigate(AdminRoutes.chat(userId, name)) },
                 onOpenSettings = { nav.navigate(AdminRoutes.SETTINGS) },
+                onOpenDashboard = { nav.navigate(AdminRoutes.DASHBOARD) },
             )
         }
         composable(AdminRoutes.SETTINGS) {
             AdminSettingsScreen(onBack = { nav.popBackStack() })
+        }
+        composable(AdminRoutes.DASHBOARD) {
+            AdminDashboardScreen(
+                onBack = { nav.popBackStack() },
+                onOpenChat = { userId, name -> nav.navigate(AdminRoutes.chat(userId, name)) },
+            )
         }
         composable(
             route = AdminRoutes.CHAT,

@@ -16,10 +16,39 @@ class JnotesApi(private val baseUrl: String, private val adminToken: String?) {
     data class Thread(
         val userId: String, val name: String, val lastMessage: String,
         val lastTs: Long, val lastFrom: String?, val unread: Int,
+        val blockChat: Boolean = false, val blockFeedback: Boolean = false,
     )
 
     data class Feedback(
         val id: String, val userId: String, val name: String, val text: String, val ts: Long,
+    )
+
+    /** Per-user moderation flags. */
+    data class BlockState(val blockChat: Boolean, val blockFeedback: Boolean)
+
+    /** Aggregate view shown on the admin dashboard. */
+    data class DashboardUser(
+        val userId: String,
+        val name: String,
+        val createdAt: Long,
+        val lastSeen: Long,
+        val messageCount: Int,
+        val feedbackCount: Int,
+        val unread: Int,
+        val lastMessage: String,
+        val lastTs: Long,
+        val blockChat: Boolean,
+        val blockFeedback: Boolean,
+    )
+
+    data class Dashboard(
+        val totalUsers: Int,
+        val activeToday: Int,
+        val totalMessages: Int,
+        val totalFeedback: Int,
+        val totalUnreadFromUsers: Int,
+        val serverUrl: String,
+        val users: List<DashboardUser>,
     )
 
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
@@ -40,8 +69,69 @@ class JnotesApi(private val baseUrl: String, private val adminToken: String?) {
                 lastTs = o.optLong("lastTs"),
                 lastFrom = if (o.isNull("lastFrom")) null else o.optString("lastFrom"),
                 unread = o.optInt("unread"),
+                blockChat = o.optBoolean("blockChat"),
+                blockFeedback = o.optBoolean("blockFeedback"),
             )
         }
+    }
+
+    /** Push a server URL to all user apps via the relay's /api/config. */
+    suspend fun pushServerUrl(url: String): Boolean = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("serverUrl", url)
+        request("POST", "/api/config", body).first in 200..299
+    }
+
+    suspend fun fetchPushedUrl(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val (code, body) = request("GET", "/api/config", null)
+            if (code !in 200..299) return@withContext null
+            JSONObject(body).optString("serverUrl", "").takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
+
+    suspend fun setUserBlock(userId: String, blockChat: Boolean?, blockFeedback: Boolean?): BlockState? =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject()
+            if (blockChat != null) body.put("blockChat", blockChat)
+            if (blockFeedback != null) body.put("blockFeedback", blockFeedback)
+            val (code, resp) = request("POST", "/api/users/$userId/block", body)
+            if (code !in 200..299) return@withContext null
+            val o = JSONObject(resp)
+            BlockState(o.optBoolean("blockChat"), o.optBoolean("blockFeedback"))
+        }
+
+    suspend fun fetchDashboard(): Dashboard? = withContext(Dispatchers.IO) {
+        runCatching {
+            val (code, body) = request("GET", "/api/admin/dashboard", null)
+            if (code !in 200..299) return@withContext null
+            val o = JSONObject(body)
+            val arr = o.optJSONArray("users") ?: JSONArray()
+            val users = List(arr.length()) { i ->
+                val u = arr.getJSONObject(i)
+                DashboardUser(
+                    userId = u.optString("userId"),
+                    name = u.optString("name"),
+                    createdAt = u.optLong("createdAt"),
+                    lastSeen = u.optLong("lastSeen"),
+                    messageCount = u.optInt("messageCount"),
+                    feedbackCount = u.optInt("feedbackCount"),
+                    unread = u.optInt("unread"),
+                    lastMessage = u.optString("lastMessage"),
+                    lastTs = u.optLong("lastTs"),
+                    blockChat = u.optBoolean("blockChat"),
+                    blockFeedback = u.optBoolean("blockFeedback"),
+                )
+            }
+            Dashboard(
+                totalUsers = o.optInt("totalUsers"),
+                activeToday = o.optInt("activeToday"),
+                totalMessages = o.optInt("totalMessages"),
+                totalFeedback = o.optInt("totalFeedback"),
+                totalUnreadFromUsers = o.optInt("totalUnreadFromUsers"),
+                serverUrl = o.optString("serverUrl"),
+                users = users,
+            )
+        }.getOrNull()
     }
 
     suspend fun listFeedback(): List<Feedback> = withContext(Dispatchers.IO) {

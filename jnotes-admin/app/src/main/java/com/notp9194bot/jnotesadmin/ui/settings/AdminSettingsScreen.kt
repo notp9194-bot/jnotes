@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.Button
@@ -27,6 +29,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.notp9194bot.jnotesadmin.data.AdminConfig
 import com.notp9194bot.jnotesadmin.data.AdminPrefs
 import com.notp9194bot.jnotesadmin.data.JnotesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -59,6 +62,30 @@ class AdminSettingsViewModel(app: Application) : AndroidViewModel(app) {
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = AdminConfig(),
     )
+
+    private val _pushedUrl = MutableStateFlow("")
+    val pushedUrl: StateFlow<String> = _pushedUrl
+
+    fun loadPushedUrl() {
+        viewModelScope.launch {
+            val cfg = config.value
+            if (cfg.serverUrl.isBlank()) return@launch
+            val u = runCatching { JnotesApi(cfg.serverUrl, cfg.adminToken).fetchPushedUrl() }.getOrNull()
+            _pushedUrl.value = u ?: ""
+        }
+    }
+
+    fun pushUrl(broadcastUrl: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val cfg = config.value
+            if (cfg.serverUrl.isBlank() || cfg.adminToken.isBlank()) return@launch onResult(false)
+            val ok = runCatching {
+                JnotesApi(cfg.serverUrl, cfg.adminToken).pushServerUrl(broadcastUrl)
+            }.getOrDefault(false)
+            if (ok) _pushedUrl.value = broadcastUrl
+            onResult(ok)
+        }
+    }
 
     fun save(serverUrl: String, token: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
@@ -83,11 +110,17 @@ class AdminSettingsViewModel(app: Application) : AndroidViewModel(app) {
 fun AdminSettingsScreen(onBack: () -> Unit) {
     val vm: AdminSettingsViewModel = viewModel(factory = AdminSettingsViewModel.Factory)
     val cfg by vm.config.collectAsState()
+    val pushed by vm.pushedUrl.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var url by remember(cfg.serverUrl) { mutableStateOf(cfg.serverUrl) }
     var token by remember(cfg.adminToken) { mutableStateOf(cfg.adminToken) }
+    var broadcast by remember(pushed, cfg.serverUrl) {
+        mutableStateOf(pushed.ifBlank { cfg.serverUrl })
+    }
+
+    LaunchedEffect(cfg.serverUrl, cfg.adminToken) { vm.loadPushedUrl() }
 
     Scaffold(
         topBar = {
@@ -106,6 +139,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -125,7 +159,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                         value = url,
                         onValueChange = { url = it },
                         label = { Text("Server URL") },
-                        placeholder = { Text("http://192.168.0.10:8787") },
+                        placeholder = { Text("https://jnotes-ypx2.onrender.com") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -155,6 +189,53 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                                 scope.launch { snackbar.showSnackbar("Cleared") }
                             }
                         }) { Text("Clear") }
+                    }
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Push server URL to user apps",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "User apps poll this value and switch to the URL you set here. " +
+                            "Use it to migrate everyone to a new backend without updating the APK.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    )
+                    if (pushed.isNotBlank()) {
+                        Text(
+                            "Currently broadcast: $pushed",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                        )
+                    }
+                    OutlinedTextField(
+                        value = broadcast,
+                        onValueChange = { broadcast = it },
+                        label = { Text("URL to broadcast") },
+                        placeholder = { Text("https://jnotes-ypx2.onrender.com") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            vm.pushUrl(broadcast.trim()) { ok ->
+                                scope.launch {
+                                    snackbar.showSnackbar(
+                                        if (ok) "Pushed to all user apps ✓" else "Push failed (check token).",
+                                    )
+                                }
+                            }
+                        }) { Text("Push to all users") }
+                        OutlinedButton(onClick = { vm.loadPushedUrl() }) { Text("Refresh") }
                     }
                 }
             }
