@@ -29,6 +29,13 @@ data class Note(
     val recurrence: Recurrence = Recurrence.NONE,
     val recurrenceInterval: Int = 1,
     val attachmentUris: List<String> = emptyList(),
+    /**
+     * Per-attachment kind, paired positionally with [attachmentUris].
+     * Values: "image" | "video" | "audio" | "file". Empty when the
+     * attachment list is empty. May be empty for older notes — callers
+     * should treat a missing entry as "file".
+     */
+    val attachmentKinds: List<String> = emptyList(),
 )
 
 fun Note.preview(max: Int = 200): String {

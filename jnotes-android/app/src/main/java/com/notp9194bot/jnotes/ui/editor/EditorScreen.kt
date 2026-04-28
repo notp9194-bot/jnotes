@@ -128,6 +128,68 @@ fun EditorScreen(
         }
     }
 
+    val pickVideo = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            vm.addAttachment(uri.toString(), "video")
+        }
+    }
+
+    val pickAudio = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            vm.addAttachment(uri.toString(), "audio")
+        }
+    }
+
+    // Pre-allocated FileProvider URIs for camera capture
+    var pendingCameraPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var pendingCameraVideoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showAudioRecorder by remember { mutableStateOf(false) }
+    var fullscreenImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
+    ) { success ->
+        if (success) {
+            pendingCameraPhotoUri?.let { vm.addAttachment(it.toString(), "image") }
+        }
+        pendingCameraPhotoUri = null
+    }
+
+    val captureVideo = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CaptureVideo(),
+    ) { success ->
+        if (success) {
+            pendingCameraVideoUri?.let { vm.addAttachment(it.toString(), "video") }
+        }
+        pendingCameraVideoUri = null
+    }
+
+    fun newMediaUri(ext: String): android.net.Uri {
+        val dir = java.io.File(context.filesDir, "attachments").apply { mkdirs() }
+        val file = java.io.File(dir, "media_${System.currentTimeMillis()}.$ext")
+        return androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+    }
+
     val exportPdf = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/pdf"),
     ) { uri: android.net.Uri? ->
@@ -427,9 +489,41 @@ fun EditorScreen(
                         }
                         HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text("Add image attachment") },
+                            text = { Text("Add image…") },
                             onClick = { moreOpen = false; pickImage.launch("image/*") },
                         )
+                        DropdownMenuItem(
+                            text = { Text("Add video…") },
+                            onClick = { moreOpen = false; pickVideo.launch("video/*") },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Add audio…") },
+                            onClick = { moreOpen = false; pickAudio.launch("audio/*") },
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Take photo") },
+                            onClick = {
+                                moreOpen = false
+                                val uri = newMediaUri("jpg")
+                                pendingCameraPhotoUri = uri
+                                runCatching { takePhoto.launch(uri) }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Record video") },
+                            onClick = {
+                                moreOpen = false
+                                val uri = newMediaUri("mp4")
+                                pendingCameraVideoUri = uri
+                                runCatching { captureVideo.launch(uri) }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Record audio") },
+                            onClick = { moreOpen = false; showAudioRecorder = true },
+                        )
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text("Move to folder…") },
                             onClick = { moreOpen = false; showFolderPicker = true },
@@ -548,11 +642,15 @@ fun EditorScreen(
                     colors = transparentFieldColors(),
                 )
                 if (note.attachmentUris.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text("Attachments (${note.attachmentUris.size})", style = MaterialTheme.typography.labelMedium)
-                    note.attachmentUris.forEach { u ->
-                        Text(u, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    com.notp9194bot.jnotes.ui.common.NoteAttachmentsView(
+                        uris = note.attachmentUris,
+                        kinds = note.attachmentKinds,
+                        onDelete = { vm.removeAttachment(it) },
+                        onImageClick = { idx ->
+                            fullscreenImageUri = android.net.Uri.parse(note.attachmentUris[idx])
+                        },
+                    )
                 }
             } else {
                 ChecklistEditor(
@@ -671,6 +769,20 @@ fun EditorScreen(
             confirmButton = {
                 TextButton(onClick = { showInfoDialog = false }) { Text("OK") }
             },
+        )
+    }
+
+    if (showAudioRecorder) {
+        com.notp9194bot.jnotes.ui.common.AudioRecorderDialog(
+            onSaved = { uri -> vm.addAttachment(uri.toString(), "audio") },
+            onDismiss = { showAudioRecorder = false },
+        )
+    }
+
+    fullscreenImageUri?.let { uri ->
+        com.notp9194bot.jnotes.ui.common.FullscreenPhotoDialog(
+            onDismiss = { fullscreenImageUri = null },
+            uri = uri,
         )
     }
 }

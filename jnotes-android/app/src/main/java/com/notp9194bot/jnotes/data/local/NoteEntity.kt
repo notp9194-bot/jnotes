@@ -48,6 +48,7 @@ fun NoteEntity.toModel(items: List<ChecklistItemEntity>, attachments: List<Attac
     recurrence = runCatching { Recurrence.valueOf(recurrenceRule) }.getOrDefault(Recurrence.NONE),
     recurrenceInterval = recurrenceInterval.coerceAtLeast(1),
     attachmentUris = attachments.map { it.uri },
+    attachmentKinds = attachments.map { it.kind },
 )
 
 fun Note.toEntity(): NoteEntity = NoteEntity(

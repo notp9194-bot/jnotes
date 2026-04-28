@@ -116,7 +116,29 @@ class EditorViewModel(
         viewModelScope.launch {
             saveNow()
             repo.addAttachment(noteId, uri, kind)
-            update { it.copy(attachmentUris = it.attachmentUris + uri) }
+            update {
+                it.copy(
+                    attachmentUris = it.attachmentUris + uri,
+                    attachmentKinds = it.attachmentKinds + kind,
+                )
+            }
+        }
+    }
+
+    fun removeAttachment(uri: String) {
+        viewModelScope.launch {
+            saveNow()
+            repo.removeAttachment(noteId, uri)
+            update {
+                val idx = it.attachmentUris.indexOf(uri)
+                if (idx < 0) it
+                else it.copy(
+                    attachmentUris = it.attachmentUris.toMutableList().also { l -> l.removeAt(idx) },
+                    attachmentKinds = it.attachmentKinds.toMutableList().also { l ->
+                        if (idx < l.size) l.removeAt(idx)
+                    },
+                )
+            }
         }
     }
 

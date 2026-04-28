@@ -121,5 +121,12 @@ class NotesRepository(
         )
     }
 
+    suspend fun removeAttachment(noteId: String, uri: String) {
+        attachmentDao.deleteByUri(noteId, uri)
+    }
+
+    suspend fun attachmentsForNote(noteId: String): List<AttachmentEntity> =
+        attachmentDao.forNote(noteId)
+
     suspend fun revisions(noteId: String): List<NoteRevisionEntity> = revisionDao.forNote(noteId)
 }

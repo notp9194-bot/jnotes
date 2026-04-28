@@ -2,21 +2,17 @@ package com.notp9194bot.jnotes.ui.about
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Feedback
@@ -32,7 +27,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.Card
@@ -43,9 +37,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,8 +56,9 @@ import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.net.Uri
 import com.notp9194bot.jnotes.R
+import com.notp9194bot.jnotes.ui.common.FullscreenPhotoDialog
 
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
@@ -68,14 +66,7 @@ fun AboutScreen(
     onOpenFeedback: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val photos = listOf(
-        R.drawable.about_1,
-        R.drawable.about_2,
-        R.drawable.about_3,
-        R.drawable.about_4,
-        R.drawable.about_5,
-    )
-    val pagerState = rememberPagerState(pageCount = { photos.size })
+    var photoOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -97,54 +88,28 @@ fun AboutScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // ── Single hero photo (tap to open full-screen) ─────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(360.dp),
+                    .height(420.dp)
+                    .clickable { photoOpen = true },
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 24.dp),
-                        pageSpacing = 12.dp,
-                    ) { page ->
-                        Image(
-                            painter = painterResource(id = photos[page]),
-                            contentDescription = "Photo ${page + 1}",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(16.dp)),
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        repeat(photos.size) { i ->
-                            val active = pagerState.currentPage == i
-                            Box(
-                                modifier = Modifier
-                                    .size(if (active) 10.dp else 8.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (active) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                    ),
-                            )
-                        }
-                    }
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.about_1),
+                    contentDescription = "Tap to view full screen",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.dp)),
+                )
             }
 
+            // ── Identity card ───────────────────────────────────────────
             Box(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -154,7 +119,8 @@ fun AboutScreen(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(120.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                            .clickable { photoOpen = true },
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -178,7 +144,7 @@ fun AboutScreen(
                 }
             }
 
-            // ── Built-by banner ───────────────────────────────────────────
+            // ── Built-by banner ─────────────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -309,12 +275,13 @@ fun AboutScreen(
                     Text(
                         "A modern, fast, and private notes app. " +
                             "Features include checklists, reminders, tags, color labels, smart filters, " +
-                            "markdown, search & replace, biometric lock, screenshot blocking, and more.",
+                            "markdown, search & replace, biometric lock, screenshot blocking, " +
+                            "audio / video / photo attachments, and more.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Version 3.0  ·  © 2026 Jenti Ninama",
+                        "Version 3.3  ·  © 2026 Jenti Ninama",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     )
@@ -327,6 +294,13 @@ fun AboutScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (photoOpen) {
+        FullscreenPhotoDialog(
+            onDismiss = { photoOpen = false },
+            drawableRes = R.drawable.about_1,
+        )
     }
 }
 
