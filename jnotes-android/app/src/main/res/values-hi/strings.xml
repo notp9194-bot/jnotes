@@ -1,0 +1,46 @@
+<resources>
+    <string name="app_name">jnotes</string>
+    <string name="reminder_channel_name">रिमाइंडर</string>
+    <string name="reminder_channel_description">नोट रिमाइंडर सूचनाएँ</string>
+    <string name="persistent_channel_name">स्टिकी नोट्स</string>
+    <string name="persistent_channel_description">स्टेटस बार में लगे नोट्स</string>
+
+    <string name="quick_capture">त्वरित नोट</string>
+
+    <string name="shortcut_new_text_short">नया नोट</string>
+    <string name="shortcut_new_text_long">नया टेक्स्ट नोट बनाएँ</string>
+    <string name="shortcut_new_check_short">नई चेकलिस्ट</string>
+    <string name="shortcut_new_check_long">नई चेकलिस्ट बनाएँ</string>
+    <string name="shortcut_quick_short">त्वरित नोट</string>
+    <string name="shortcut_quick_long">तुरंत नोट लिखें</string>
+
+    <string name="widget_sticky_label">स्टिकी नोट</string>
+    <string name="widget_sticky_description">होम स्क्रीन पर पिन किया नोट</string>
+    <string name="widget_empty">जोड़ने के लिए टैप करें</string>
+    <string name="widget_new">+</string>
+
+    <string name="action_snooze_10">10 मि. बाद</string>
+    <string name="action_snooze_1h">1 घं. बाद</string>
+    <string name="action_snooze_tomorrow">कल</string>
+    <string name="action_done">पूरा</string>
+
+    <string name="settings_amoled">AMOLED काला</string>
+    <string name="settings_amoled_sub">डार्क मोड में पूर्ण काला बैकग्राउंड</string>
+    <string name="settings_font_scale">फ़ॉन्ट स्केल</string>
+    <string name="settings_auto_lock">इतनी देर बाद ऑटो-लॉक</string>
+    <string name="settings_persistent_note">स्थायी स्टिकी नोट</string>
+    <string name="settings_persistent_note_sub">पिन किया नोट स्टेटस बार में दिखाएँ</string>
+    <string name="settings_webdav">WebDAV / Nextcloud सिंक</string>
+    <string name="settings_auto_backup">ऑटो बैकअप</string>
+    <string name="settings_biometric">अनलॉक के लिए बायोमेट्रिक</string>
+    <string name="settings_recurring">दोहराने वाले रिमाइंडर</string>
+    <string name="settings_folders">फ़ोल्डर</string>
+    <string name="settings_templates">कस्टम टेम्पलेट</string>
+    <string name="settings_language">भाषा</string>
+
+    <string name="recurrence_none">कोई नहीं</string>
+    <string name="recurrence_daily">रोज़</string>
+    <string name="recurrence_weekly">हर हफ़्ते</string>
+    <string name="recurrence_monthly">हर महीने</string>
+    <string name="recurrence_yearly">हर साल</string>
+</resources>
