@@ -21,7 +21,7 @@ jobs:
       # 🔥 USER APP BUILD
       - name: Build User APK
         run: |
-          cd jnotes-user
+          cd jnotes-android
           chmod +x gradlew
           ./gradlew assembleDebug
 
@@ -33,7 +33,7 @@ jobs:
           ./gradlew assembleDebug
 
       # 📦 Upload USER APK
-      - name: Upload User APK
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: user-app
