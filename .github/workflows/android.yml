@@ -3,22 +3,21 @@ name: Build APK
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:   # 👈 ye add karo
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Set up JDK
-      uses: actions/setup-java@v4
+    - uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Build APK from jnotes-android
+    - name: Build APK
       run: |
         cd jnotes-android
         chmod +x gradlew
