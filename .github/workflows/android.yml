@@ -21,7 +21,7 @@ jobs:
       # 🔥 USER APP BUILD
       - name: Build User APK
         run: |
-          cd jnotes-android
+          cd jnotes-user
           chmod +x gradlew
           ./gradlew assembleDebug
 
@@ -37,11 +37,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: user-app
-          path: jnotes-android/app/build/outputs/apk/debug/app-debug.apk
+          path: jnotes-user/app/build/outputs/apk/debug/*.apk
 
       # 📦 Upload ADMIN APK
       - name: Upload Admin APK
         uses: actions/upload-artifact@v4
         with:
           name: admin-app
-          path: jnotes-admin/app/build/outputs/apk/debug/app-debug.apk
+          path: jnotes-admin/app/build/outputs/apk/debug/*.apk
